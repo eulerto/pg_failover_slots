@@ -56,7 +56,7 @@ regression_slot2 | f
 regression_slot3 | f
 ```
 
-Now all the the three slots are synchronized and the standby can be used
+Now all the three slots are synchronized and the standby can be used
 for failover without losing logical decoding state for any of them.
 
 ## Prerequisite settings
