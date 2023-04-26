@@ -649,16 +649,16 @@ wait_for_primary_slot_catchup(ReplicationSlot *slot, RemoteSlot *remote_slot)
 }
 
 /*
- * Synchronize one logical replication slot's state from the master to this
+ * Synchronize one logical replication slot's state from the primary to this
  * standby, creating it if necessary.
  *
  * Note that this only works safely because we know for sure that this is
  * executed on standby where primary has another slot which reserves resources
  * at the position to which we are moving the local slot to.
  *
- * This standby uses a physical replication slot to connect to the master so it
+ * This standby uses a physical replication slot to connect to the primary so it
  * can send the xmin and catalog_xmin separately over hot_standby_feedback. Our
- * physical slot on the master ensures the master's catalog_xmin never goes
+ * physical slot on the primary ensures the primary's catalog_xmin never goes
  * below ours after the initial setup period.
  */
 static void
@@ -674,7 +674,7 @@ synchronize_one_slot(RemoteSlot *remote_slot)
 			WARNING,
 			(errcode(ERRCODE_OBJECT_NOT_IN_PREREQUISITE_STATE),
 			 errmsg(
-				 "attempted to sync slot from master when not in recovery")));
+				 "attempted to sync slot from primary when not in recovery")));
 		return;
 	}
 
@@ -717,7 +717,7 @@ synchronize_one_slot(RemoteSlot *remote_slot)
 		 * local restart_lsn, catalog_xmin and xmin.
 		 *
 		 * This shouldn't happen for existing slots unless someone else messed
-		 * with our physical replication slot on the master.
+		 * with our physical replication slot on the primary.
 		 */
 		if (remote_slot->restart_lsn < MyReplicationSlot->data.restart_lsn ||
 			TransactionIdPrecedes(remote_slot->catalog_xmin,
@@ -793,7 +793,7 @@ synchronize_one_slot(RemoteSlot *remote_slot)
 
 		/*
 		 * Our xmin and/or catalog_xmin may be > that required by one or more
-		 * of the slots we are trying to sync from the master, and/or we don't
+		 * of the slots we are trying to sync from the primary, and/or we don't
 		 * have enough retained WAL for the slot's restart_lsn.
 		 *
 		 * If we persist the slot locally in that state it'll make a false
@@ -846,7 +846,7 @@ synchronize_one_slot(RemoteSlot *remote_slot)
 }
 
 /*
- * Synchronize the slot states from master to standby.
+ * Synchronize the slot states from primary to standby.
  *
  * This logic emulates the "failover slots" behaviour unsuccessfully proposed
  * for 9.6 using the PostgreSQL 10 features "catalog xmin in hot standby
@@ -861,13 +861,13 @@ synchronize_one_slot(RemoteSlot *remote_slot)
  * before PG10, it's pointless to have slots synchronized. Also, older versions
  * can't keep catalog_xmin separate from xmin in hot standby feedback, so
  * sending the feedback we need to preserve our catalog_xmin could cause severe
- * table bloat on the master.
+ * table bloat on the primary.
  *
- * This runs periodically. That's safe when the slots on the master already
+ * This runs periodically. That's safe when the slots on the primary already
  * exist locally because we have their resources reserved via hot standby
  * feedback. New subscriptions can't move that position backwards... but we
- * won't immediately know they exist when the master creates them. So there's a
- * window after each new subscription is created on the master where failover
+ * won't immediately know they exist when the primary creates them. So there's a
+ * window after each new subscription is created on the primary where failover
  * to this standby will break that subscription.
  */
 static long
@@ -925,7 +925,7 @@ synchronize_failover_slots(long sleep_time)
 	safe_lsn = remote_get_physical_slot_lsn(conn, WalRcv->slotname);
 
 	/*
-	 * Delete locally-existing slots that don't exist on the master.
+	 * Delete locally-existing slots that don't exist on the primary.
 	 */
 	for (;;)
 	{
@@ -1036,7 +1036,7 @@ synchronize_failover_slots(long sleep_time)
 		 * received from the provider before failover. We can't detect or
 		 * prevent that as the same fast forward is normal when we lost slot
 		 * state in a provider crash after subscriber committed but before we
-		 * saved the new confirmed flush lsn. The master will also fast forward
+		 * saved the new confirmed flush lsn. The primary will also fast forward
 		 * the slot over irrelevant changes and then the subscriber will update
 		 * its confirmed_flush_lsn in response to master standby status
 		 * updates.
@@ -1047,7 +1047,7 @@ synchronize_failover_slots(long sleep_time)
 
 		/*
 		 * For simplicity we always move restart_lsn of all slots to the
-		 * restart_lsn needed by the furthest-behind master slot.
+		 * restart_lsn needed by the furthest-behind slot on primary.
 		 */
 		if (remote_slot->restart_lsn > lsn)
 			remote_slot->restart_lsn = lsn;
