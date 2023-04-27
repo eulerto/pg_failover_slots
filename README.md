@@ -67,7 +67,7 @@ The extension throws hard errors if the following settings are not adjusted:
 - `primary_slot_name` should be non-empty
 
 These are necessary to connect to the primary so it can send the xmin and
-catalog_xmin separately over hot_standby_feedback.
+catalog_xmin separately over `hot_standby_feedback`.
 
 ## Configuration options
 
@@ -93,7 +93,7 @@ can be one of:
 The `key` can be omitted and will default to `name` in that case.
 
 For example, `'my_slot_name,plugin:test_decoding'` will
-synchronize the slot named "my_slot_name" and any slots that use the test_decoding plugin.
+synchronize the slot named "my_slot_name" and any slots that use the `test_decoding` plugin.
 
 If this is set to an empty string, no slots will be synchronized to this physical
 standby.
